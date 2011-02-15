@@ -1,5 +1,5 @@
 % Copyright 2010 Cloudant
-% 
+%
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
@@ -35,6 +35,9 @@ start_link() ->
 init([]) ->
     {ok, #st{}}.
 
+handle_call(worker_count, _From, #st{workers = Workers} = St) ->
+    {reply, {ok, proplists:get_value(size, ets:info(Workers))}, St};
+
 handle_call(get_errors, _From, #st{errors = Errors} = St) ->
     {reply, {ok, lists:reverse(queue:to_list(Errors))}, St};
 
@@ -63,10 +66,12 @@ handle_cast({doit, From, MFA}, St) ->
 
 handle_cast({doit, From, Nonce, MFA}, #st{workers=Workers} = St) ->
     {LocalPid, Ref} = spawn_monitor(?MODULE, init_p, [From, MFA, Nonce]),
+    %io:format("spawning ~p ~n",[Ref]),
     {noreply, St#st{workers = add_worker({LocalPid, Ref, From}, Workers)}};
 
 
 handle_cast({kill, FromRef}, #st{workers=Workers} = St) ->
+    %io:format("explicitly kill ~p ~n",[FromRef]),
     case find_worker_from(FromRef, Workers) of
     {Pid, KeyRef, {_, FromRef}} ->
         erlang:demonitor(KeyRef),
@@ -81,9 +86,11 @@ handle_cast(_, St) ->
     {noreply, St}.
 
 handle_info({'DOWN', Ref, process, _, normal}, #st{workers=Workers} = St) ->
+    %io:format("normal down message ~p ~n",[Ref]),
     {noreply, St#st{workers = remove_worker(Ref, Workers)}};
 
 handle_info({'DOWN', Ref, process, Pid, Error}, #st{workers=Workers} = St) ->
+    %io:format("normal for other issues message ~p ~n",[Ref]),
     case find_worker(Ref, Workers) of
     {Pid, Ref, From} ->
         case Error of #error{reason = {_Class, Reason}, stack = Stack} ->

@@ -1,5 +1,5 @@
 % Copyright 2010 Cloudant
-% 
+%
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
@@ -17,7 +17,7 @@
 -export([cast/2, cast/3, kill/2]).
 -export([reply/1, sync_reply/1, sync_reply/2]).
 -export([async_server_call/2, async_server_call/3]).
--export([get_errors/0, get_last_error/0, set_error_limit/1]).
+-export([get_errors/0, worker_count/0, get_last_error/0, set_error_limit/1]).
 
 -include("rexi.hrl").
 
@@ -31,6 +31,9 @@ stop() ->
 
 restart() ->
     stop(), start().
+
+worker_count() ->
+    gen_server:call(?SERVER, worker_count, infinity).
 
 -spec get_errors() -> {ok, [#error{}]}.
 get_errors() ->
