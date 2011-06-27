@@ -89,8 +89,12 @@ handle_cast(_, St) ->
     {noreply, St}.
 
 handle_info({'DOWN', Ref, process, _, normal}, #st{workers=Workers} = St) ->
-    Job = find_worker(Ref, Workers),
-    {noreply, remove_job(Job, St)};
+    case find_worker(Ref, Workers) of
+    #job{} = Job ->
+        {noreply, remove_job(Job, St)};
+    false ->
+        {noreply, St}
+    end;
 
 handle_info({'DOWN', Ref, process, Pid, Error}, #st{workers=Workers} = St) ->
     case find_worker(Ref, Workers) of
