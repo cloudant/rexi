@@ -1,0 +1,31 @@
+NODEHOST=`hostname -f`
+if test ! -n "$DIRPATH"; then DIRPATH=`pwd`; fi
+echo "==> configuring common tests nodes"
+mkdir -p test/logs
+cat > test/rexi-ct.spec << EOF
+{node, a, 'a@$NODEHOST'}.
+{node, b, 'b@$NODEHOST'}.
+{node, c, 'c@$NODEHOST'}.
+
+{config, [a], "rexi.cfg"}.
+EOF
+nodes[0]=a
+nodes[1]=b
+nodes[2]=c
+for i in 1 2 3; do
+
+cat >> test/rexi-ct.spec << EOF
+
+{init, [${nodes[$i-1]}], [{node_start, [{monitor_master, true},
+                   {erl_flags, "+P 100000 -pa $DIRPATH/ebin   $DIRPATH/deps/twig/ebin"}]}]}.
+EOF
+done
+cat >> test/rexi-ct.spec << EOF
+
+{alias, rexi, "./rexi/"}.
+
+{logdir, [all_nodes, master], "./logs/"}.
+
+{suites, [a, b, c], rexi, all}.
+EOF
+./rebar get-deps && ./rebar update-deps
