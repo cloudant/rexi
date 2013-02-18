@@ -59,6 +59,8 @@ get_governor(Node) ->
 % gen_server callbacks
 
 init([]) ->
+    folsom_metrics:new_counter([dbcore, rexi, spawned]),
+    folsom_metrics:new_counter([dbcore, rexi, dropped]),
     ets:new(govs, [named_table, set, {read_concurrency, true}]),
     net_kernel:monitor_nodes(true),
     NodeOutTimeout = config:get("rexi","nodeout_timeout","500"),

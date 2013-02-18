@@ -41,11 +41,11 @@ handle_cast({spawn_and_track, Dest, Msg},
     true ->
         {Pid, Ref} = spawn_monitor(erlang, send, [Dest, Msg]),
         ets:insert(Pids, {Pid, Ref}),
-        margaret_counter:increment([erlang, rexi, spawned]),
+        folsom_metrics:notify([dbcore, rexi, spawned], {inc, 1}),
         {SC + 1, DC};
     false ->
         % drop message on floor
-        margaret_counter:increment([erlang, rexi, dropped]),
+        folsom_metrics:notify([dbcore, rexi, dropped], {inc, 1}),
         {SC, DC + 1}
     end,
     {noreply, State#state{spawn_cnt = NewSC, drop_cnt = NewDC}};
