@@ -32,14 +32,6 @@ init([]) ->
             [rexi_gov_manager]
         },
         {
-            rexi_server,
-            {rexi_server, start_link, [rexi_server]},
-            permanent,
-            100,
-            worker,
-            [rexi_server]
-        },
-        {
             rexi_server_sup,
             {rexi_server_sup, start_link, []},
             permanent,
