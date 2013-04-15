@@ -101,7 +101,8 @@ start_rexi_servers() ->
 
 
 missing_servers() ->
-    ServerIds = [rexi_utils:server_id(Node) || Node <- [node() | nodes()]],
+    ServerIds = [rexi_utils:server_id(Node) || Node <- [node() | nodes()],
+        rexi_utils:server_id(Node) =/= rexi_server],
     ChildIds = [Id || {Id, _, _, _} <- supervisor:which_children(?SUP_MODULE)],
     ServerIds -- ChildIds.
 
