@@ -39,6 +39,8 @@ process_mailbox(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
         process_mailbox(RefList, Keypos, Fun, Acc, TimeoutRef, PerMsgTO);
     {stop, Acc} ->
         {ok, Acc};
+    {new_timeout, NewTimeout, Acc} ->
+        process_mailbox(RefList, Keypos, Fun, Acc, TimeoutRef, NewTimeout);
     Error ->
         Error
     end.
