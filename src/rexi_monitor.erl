@@ -42,6 +42,7 @@ stop(MonitoringPid) ->
 %% internal functions %%
 
 notify_parent(Parent, Pid, Reason) ->
+    margaret_counter:increment([erlang, rexi, down]),
     erlang:send(Parent, {rexi_DOWN, self(), Pid, Reason}).
 
 should_monitor(Pid, Nodes) when is_pid(Pid) ->
