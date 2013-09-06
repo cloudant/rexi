@@ -183,7 +183,7 @@ stream(Msg, Limit, Timeout) ->
             erlang:send(Caller, {Ref, self(), Msg}),
             ok
     catch throw:timeout ->
-        timeout
+        exit(timeout)
     end.
 
 %% @equiv stream_ack(Client, 1)
