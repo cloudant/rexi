@@ -59,6 +59,11 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     {rexi, Ref, From, Msg} ->
         case lists:keyfind(Ref, Keypos, RefList) of
         false ->
+            if Msg =:= rexi_STREAM_INIT ->
+                rexi:stream_cancel(From);
+            true ->
+                ok
+            end,
             {ok, Acc0};
         Worker ->
             Fun(Msg, {Worker, From}, Acc0)
@@ -74,6 +79,11 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     {Ref, From, Msg} ->
         case lists:keyfind(Ref, Keypos, RefList) of
         false ->
+            if Msg =:= rexi_STREAM_INIT ->
+                rexi:stream_cancel(From);
+            true ->
+                ok
+            end,
             {ok, Acc0};
         Worker ->
             Fun(Msg, {Worker, From}, Acc0)
