@@ -49,13 +49,6 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     receive
     {timeout, TimeoutRef} ->
         {timeout, Acc0};
-    {rexi, Ref, From, rexi_STREAM_INIT} ->
-        case lists:keyfind(Ref, Keypos, RefList) of
-        false ->
-            rexi:reply(From, rexi_STREAM_CANCEL);
-        Worker ->
-            Fun(rexi_STREAM_INIT, {Worker, From}, Acc0)
-        end;
     {rexi, Ref, Msg} ->
         case lists:keyfind(Ref, Keypos, RefList) of
         false ->
@@ -66,16 +59,14 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     {rexi, Ref, From, Msg} ->
         case lists:keyfind(Ref, Keypos, RefList) of
         false ->
+            if Msg =:= rexi_STREAM_INIT ->
+                rexi:reply(From, rexi_STREAM_CANCEL);
+            true ->
+                ok
+            end,
             {ok, Acc0};
         Worker ->
             Fun(Msg, {Worker, From}, Acc0)
-        end;
-    {Ref, From, rexi_STREAM_INIT} ->
-        case lists:keyfind(Ref, Keypos, RefList) of
-        false ->
-            rexi:reply(From, rexi_STREAM_CANCEL);
-        Worker ->
-            Fun(rexi_STREAM_INIT, {Worker, From}, Acc0)
         end;
     {Ref, Msg} ->
         case lists:keyfind(Ref, Keypos, RefList) of
@@ -88,6 +79,11 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     {Ref, From, Msg} ->
         case lists:keyfind(Ref, Keypos, RefList) of
         false ->
+            if Msg =:= rexi_STREAM_INIT ->
+                rexi:reply(From, rexi_STREAM_CANCEL);
+            true ->
+                ok
+            end,
             {ok, Acc0};
         Worker ->
             Fun(Msg, {Worker, From}, Acc0)
