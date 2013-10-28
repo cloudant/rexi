@@ -48,6 +48,7 @@ cast(Node, MFA) ->
 %% `{Ref, {rexi_EXIT, Reason}}' where Ref is the returned reference.
 -spec cast(node(), pid(), {atom(), atom(), list()}) -> reference().
 cast(Node, Caller, MFA) ->
+    margaret_counter:increment([rexi, send, cast_async]),
     Ref = make_ref(),
     Msg = cast_msg({doit, {Caller, Ref}, get(nonce), MFA}),
     rexi_utils:send(rexi_utils:server_pid(Node), Msg),
@@ -62,11 +63,13 @@ cast(Node, Caller, MFA) ->
 cast(Node, Caller, MFA, Options) ->
     case lists:member(sync, Options) of
         true ->
+            margaret_counter:increment([rexi, send, cast_sync]),
             Ref = make_ref(),
             Msg = cast_msg({doit, {Caller, Ref}, get(nonce), MFA}),
             erlang:send(rexi_utils:server_pid(Node), Msg),
             Ref;
         false ->
+            margaret_counter:increment([rexi, send, cast_async]),
             cast(Node, Caller, MFA)
     end.
 
@@ -74,6 +77,7 @@ cast(Node, Caller, MFA, Options) ->
 %% No rexi_EXIT message will be sent.
 -spec kill(node(), reference()) -> ok.
 kill(Node, Ref) ->
+    margaret_counter:increment([rexi, send, kill]),
     % This first version is to tide us over during the upgrade. We'll
     % remove it in the next commit that will be in a separate release.
     rexi_utils:send({rexi_server, Node}, cast_msg({kill, Ref})),
@@ -99,6 +103,7 @@ async_server_call(Server, Caller, Request) ->
 %% @doc convenience function to reply to the original rexi Caller.
 -spec reply(any()) -> any().
 reply(Reply) ->
+    margaret_counter:incrememnt([rexi, reply, async]),
     {Caller, Ref} = get(rexi_from),
     erlang:send(Caller, {Ref,Reply}).
 
@@ -111,6 +116,7 @@ sync_reply(Reply) ->
 %% original caller to respond back.
 -spec sync_reply(any(), pos_integer() | infinity) -> any().
 sync_reply(Reply, Timeout) ->
+    margaret_counter:increment([rexi, reply, sync]),
     {Caller, Ref} = get(rexi_from),
     Tag = make_ref(),
     erlang:send(Caller, {Ref, {self(),Tag}, Reply}),
@@ -179,11 +185,13 @@ stream(Msg, Limit) ->
 stream(Msg, Limit, Timeout) ->
     try maybe_wait(Limit, Timeout) of
         {ok, Count} ->
+            margaret_counter:increment([rexi, streams, send]),
             put(rexi_unacked, Count+1),
             {Caller, Ref} = get(rexi_from),
             erlang:send(Caller, {Ref, self(), Msg}),
             ok
     catch throw:timeout ->
+        margaret_counter:increment([rexi, streams, send_timeout]),
         exit(timeout)
     end.
 
@@ -213,6 +221,7 @@ stream_last(Msg) ->
 %% this and stream is that it uses rexi:reply/1 which doesn't include
 %% the worker pid and doesn't wait for a response from the controller.
 stream_last(Msg, Timeout) ->
+    margaret_counter:increment([rexi, stream, last]),
     maybe_init_stream(Timeout),
     rexi:reply(Msg).
 
@@ -239,13 +248,17 @@ maybe_init_stream(Timeout) ->
 init_stream(Timeout) ->
     case sync_reply(rexi_STREAM_INIT, Timeout) of
         rexi_STREAM_START ->
+            margaret_counter:increment([rexi, streams, stream_init_ok]),
             put(rexi_STREAM_INITED, true),
             ok;
         rexi_STREAM_CANCEL ->
+            margaret_counter:increment([rexi, stream, stream_init_canceled]),
             exit(normal);
         timeout ->
+            margaret_counter:increment([rexi, stream, stream_init_timeout]),
             exit(timeout);
         Else ->
+            margaret_counter:increment([rexi, stream, stream_init_error]),
             exit({invalid_stream_message, Else})
     end.
 
@@ -261,16 +274,22 @@ maybe_wait(Limit, Timeout) ->
 
 wait_for_ack(Count, Timeout) ->
     receive
-        {rexi_ack, N} -> drain_acks(Count-N)
+        {rexi_ack, N} ->
+            margaret_counter:increment([rexi, streams, ack_ok], N),
+            drain_acks(Count-N)
     after Timeout ->
+        margaret_counter:increment([rexi, stream, ack_timeout]),
         throw(timeout)
     end.
 
 drain_acks(Count) when Count < 0 ->
+    margaret_counter:increment([rexi, stream, ack_mismatch]),
     erlang:error(mismatched_rexi_ack);
 drain_acks(Count) ->
     receive
-        {rexi_ack, N} -> drain_acks(Count-N)
+        {rexi_ack, N} ->
+            margaret_counter:increment([rexi, stream, ack_ok], N),
+            drain_acks(Count-N)
     after 0 ->
         {ok, Count}
     end.
