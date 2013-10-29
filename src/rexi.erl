@@ -139,7 +139,8 @@ stream_init(Timeout) ->
         rexi_STREAM_CANCEL ->
             exit(normal);
         timeout ->
-            exit(timeout);
+            margaret_counter:increment([rexi, streams, timeout, init_stream]),
+            exit(normal);
         Else ->
             exit({invalid_stream_message, Else})
     end.
@@ -184,7 +185,8 @@ stream(Msg, Limit, Timeout) ->
             erlang:send(Caller, {Ref, self(), Msg}),
             ok
     catch throw:timeout ->
-        exit(timeout)
+        margaret_counter:increment([rexi, streams, timeout, stream]),
+        exit(normal)
     end.
 
 %% @equiv stream2(Msg, 10, 300000)
@@ -210,7 +212,8 @@ stream2(Msg, Limit, Timeout) ->
             erlang:send(Caller, {Ref, self(), Msg}),
             ok
     catch throw:timeout ->
-        exit(timeout)
+        margaret_counter:increment([rexi, streams, timeout, stream]),
+        exit(normal)
     end.
 
 %% @equiv stream_last(Msg, 300000)
@@ -252,7 +255,8 @@ init_stream(Timeout) ->
         rexi_STREAM_CANCEL ->
             exit(normal);
         timeout ->
-            exit(timeout);
+            margaret_counter:increment([rexi, streams, timeout, init_stream]),
+            exit(normal);
         Else ->
             exit({invalid_stream_message, Else})
     end.
@@ -271,6 +275,7 @@ wait_for_ack(Count, Timeout) ->
     receive
         {rexi_ack, N} -> drain_acks(Count-N)
     after Timeout ->
+        margaret_counter:increment([rexi, streams, timeout, wait_for_ack]),
         throw(timeout)
     end.
 
