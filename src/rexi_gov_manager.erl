@@ -14,6 +14,7 @@
 -module(rexi_gov_manager).
 
 -behaviour(gen_server).
+-vsn(1).
 -behaviour(config_listener).
 
 % API
