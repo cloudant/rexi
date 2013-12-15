@@ -1,4 +1,4 @@
-{"2.4.3",
+{"2.4.4",
     [{"2.3.0", [
         % Just an updated arity on the start_link interface here
         {load_module, rexi_server_sup},
@@ -12,7 +12,7 @@
         {apply, {supervisor, restart_child, [rexi_sup, rexi_buffer_sup]}},
         {apply, {supervisor, restart_child, [rexi_sup, rexi_buffer_mon]}},
         % Use the new buffering system
-        {load_module, rexi_utils, [rexi_buffer, rexi_buffer_sup]},
+        {load_module, rexi_utils, [rexi_buffer, rexi_server_sup]},
         % Now cleanup the old system
         {apply, {supervisor, terminate_child, [rexi_sup, rexi_gov_manager]}},
         {apply, {supervisor, delete_child, [rexi_sup, rexi_gov_manager]}},
