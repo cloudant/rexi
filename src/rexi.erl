@@ -64,7 +64,19 @@ cast(Node, Caller, MFA, Options) ->
         true ->
             Ref = make_ref(),
             Msg = cast_msg({doit, {Caller, Ref}, get(nonce), MFA}),
-            erlang:send(rexi_utils:server_pid(Node), Msg),
+            SendFun = fun() ->
+                erlang:send(rexi_utils:server_pid(Node), Msg)
+            end,
+            case config:get("latency_monkey", "enabled") of
+            "true" ->
+                rexi_latency_monkey:maybe_go_bananas(
+                    Msg,
+                    rexi_utils:server_pid(Node),
+                    SendFun
+                );
+            _ ->
+                SendFun()
+            end,
             Ref;
         false ->
             cast(Node, Caller, MFA)

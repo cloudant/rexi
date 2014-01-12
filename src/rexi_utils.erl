@@ -17,12 +17,20 @@ server_pid(Node) ->
 
 %% @doc send a message as quickly as possible
 send(Dest, Msg) ->
-    case erlang:send(Dest, Msg, [noconnect, nosuspend]) of
-    ok ->
-        ok;
+    SendFun = fun() ->
+        case erlang:send(Dest, Msg, [noconnect, nosuspend]) of
+        ok ->
+            ok;
+        _ ->
+            % treat nosuspend and noconnect the same
+            rexi_buffer:send(Dest, Msg)
+        end
+    end,
+    case config:get("latency_monkey", "enabled") of
+    "true" ->
+        rexi_latency_monkey:maybe_go_bananas(Msg, Dest, SendFun);
     _ ->
-        % treat nosuspend and noconnect the same
-        rexi_buffer:send(Dest, Msg)
+        SendFun()
     end.
 
 %% @doc set up the receive loop with an overall timeout
