@@ -48,7 +48,7 @@ cast(Node, MFA) ->
 %% `{Ref, {rexi_EXIT, Reason}}' where Ref is the returned reference.
 -spec cast(node(), pid(), {atom(), atom(), list()}) -> reference().
 cast(Node, Caller, MFA) ->
-    Ref = make_ref(),
+    Ref = rexi_utils:timed_ref(),
     Msg = cast_msg({doit, {Caller, Ref}, get(nonce), MFA}),
     rexi_utils:send(rexi_utils:server_pid(Node), Msg),
     Ref.
@@ -62,7 +62,7 @@ cast(Node, Caller, MFA) ->
 cast(Node, Caller, MFA, Options) ->
     case lists:member(sync, Options) of
         true ->
-            Ref = make_ref(),
+            Ref = rexi_utils:timed_ref(),
             Msg = cast_msg({doit, {Caller, Ref}, get(nonce), MFA}),
             erlang:send(rexi_utils:server_pid(Node), Msg),
             Ref;
@@ -92,7 +92,7 @@ async_server_call(Server, Request) ->
 %% monitor it themselves before calling this function.
 -spec async_server_call(pid() | {atom(),node()}, pid(), any()) -> reference().
 async_server_call(Server, Caller, Request) ->
-    Ref = make_ref(),
+    Ref = rexi_utils:timed_ref(),
     rexi_utils:send(Server, {'$gen_call', {Caller,Ref}, Request}),
     Ref.
 
@@ -112,7 +112,7 @@ sync_reply(Reply) ->
 -spec sync_reply(any(), pos_integer() | infinity) -> any().
 sync_reply(Reply, Timeout) ->
     {Caller, Ref} = get(rexi_from),
-    Tag = make_ref(),
+    Tag = rexi_utils:timed_ref(),
     erlang:send(Caller, {Ref, {self(),Tag}, Reply}),
     receive {Tag, Response} ->
         Response

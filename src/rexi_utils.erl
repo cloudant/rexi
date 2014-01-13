@@ -1,6 +1,6 @@
 -module(rexi_utils).
 
--export([server_id/1, server_pid/1, send/2, recv/6]).
+-export([server_id/1, server_pid/1, send/2, recv/6, timed_ref/0]).
 
 %% @doc Return a rexi_server id for the given node.
 server_id(Node) ->
@@ -55,33 +55,45 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     receive
     {timeout, TimeoutRef} ->
         {timeout, Acc0};
-    {rexi, Ref, Msg} ->
+    {rexi, {T, _}=Ref, Msg} ->
         case lists:keyfind(Ref, Keypos, RefList) of
         false ->
             {ok, Acc0};
         Worker ->
+            margaret_dist:update(
+                [rexi, latency], timer:now_diff(erlang:now(), T)
+            ),
             Fun(Msg, Worker, Acc0)
         end;
-    {rexi, Ref, From, Msg} ->
+    {rexi, {T, _}=Ref, From, Msg} ->
         case lists:keyfind(Ref, Keypos, RefList) of
         false ->
             {ok, Acc0};
         Worker ->
+            margaret_dist:update(
+                [rexi, latency], timer:now_diff(erlang:now(), T)
+            ),
             Fun(Msg, {Worker, From}, Acc0)
         end;
-    {Ref, Msg} ->
+    {{T, _}=Ref, Msg} ->
         case lists:keyfind(Ref, Keypos, RefList) of
         false ->
             % this was some non-matching message which we will ignore
             {ok, Acc0};
         Worker ->
+            margaret_dist:update(
+                [rexi, latency], timer:now_diff(erlang:now(), T)
+            ),
             Fun(Msg, Worker, Acc0)
         end;
-    {Ref, From, Msg} ->
+    {{T, _}=Ref, From, Msg} ->
         case lists:keyfind(Ref, Keypos, RefList) of
         false ->
             {ok, Acc0};
         Worker ->
+            margaret_dist:update(
+                [rexi, latency], timer:now_diff(erlang:now(), T)
+            ),
             Fun(Msg, {Worker, From}, Acc0)
         end;
     {rexi_DOWN, _, _, _} = Msg ->
@@ -89,3 +101,6 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     after PerMsgTO ->
         {timeout, Acc0}
     end.
+
+timed_ref() ->
+    {erlang:now(), erlang:make_ref()}.
