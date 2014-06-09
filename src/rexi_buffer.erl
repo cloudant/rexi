@@ -31,9 +31,6 @@
     count = 0
 }).
 
-%% TODO Leverage os_mon to discover available memory in the system
--define (MAX_MEMORY, 17179869184).
-
 start_link(ServerId) ->
     gen_server:start_link({local, ServerId}, ?MODULE, nil, []).
 
@@ -43,7 +40,12 @@ send(Dest, Msg) ->
 
 
 init(_) ->
-    {ok, #state{}}.
+    %% TODO Leverage os_mon to discover available memory in the system
+    Max = list_to_integer(config:get("rexi", "buffer_count", "2000")),
+    {ok, #state{max_count = Max}}.
+
+handle_call(erase_buffer, _From, State) ->
+    {reply, ok, State#state{buffer = queue:new(), count = 0}, 0};
 
 handle_call(get_buffered_count, _From, State) ->
     {reply, State#state.count, State, 0}.
@@ -51,7 +53,7 @@ handle_call(get_buffered_count, _From, State) ->
 handle_cast({deliver, Dest, Msg}, #state{buffer = Q, count = C} = State) ->
     margaret_counter:increment([erlang, rexi, buffered]),
     Q2 = queue:in({Dest, Msg}, Q),
-    case should_drop() of
+    case should_drop(State) of
         true ->
             margaret_counter:increment([erlang, rexi, dropped]),
             {noreply, State#state{buffer = queue:drop(Q2)}, 0};
@@ -59,37 +61,25 @@ handle_cast({deliver, Dest, Msg}, #state{buffer = Q, count = C} = State) ->
             {noreply, State#state{buffer = Q2, count = C+1}, 0}
     end.
 
-handle_info(timeout, #state{sender = nil} = State) ->
-    #state{buffer = Q, count = C} = State,
-    Sender = case queue:out_r(Q) of
-        {{value, {Dest, Msg}}, Q2} ->
-            case erlang:send(Dest, Msg, [noconnect, nosuspend]) of
-                ok ->
-                    nil;
-                _Else ->
-                    spawn_monitor(erlang, send, [Dest, Msg])
-            end;
-        {empty, Q2} ->
-            nil
-    end,
-    if Sender =:= nil, C > 1 ->
-        {noreply, State#state{buffer = Q2, count = C-1}, 0};
-    true ->
-        NewState = State#state{buffer = Q2, sender = Sender, count = C-1},
-        % When Sender is nil and C-1 == 0 we're reverting to an
-        % idle state with no outstanding or queued messages. We'll
-        % use this oppurtunity to hibernate this process and
-        % run a garbage collection.
-        case {Sender, C-1} of
-            {nil, 0} ->
-                {noreply, NewState, hibernate};
-            _ ->
-                {noreply, NewState, infinity}
-        end
-    end;
-handle_info(timeout, State) ->
-    % Waiting on a sender to return
+handle_info(timeout, #state{sender = nil, buffer = {[],[]}, count = 0}=State) ->
     {noreply, State};
+handle_info(timeout, #state{sender = nil, count = C} = State) when C > 0 ->
+    #state{buffer = Q, count = C} = State,
+    {{value, {Dest, Msg}}, Q2} = queue:out_r(Q),
+    NewState = State#state{buffer = Q2, count = C-1},
+    case erlang:send(Dest, Msg, [noconnect, nosuspend]) of
+        ok when C =:= 1 ->
+            % We just sent the last queued messsage, we'll use this opportunity
+            % to hibernate the process and run a garbage collection
+            {noreply, NewState, hibernate};
+        ok when C > 1 ->
+            % Use a zero timeout to recurse into this handler ASAP
+            {noreply, NewState, 0};
+        _Else ->
+            % We're experiencing delays, keep buffering internally
+            Sender = spawn_monitor(erlang, send, [Dest, Msg]),
+            {noreply, NewState#state{sender = Sender}}
+    end;
 
 handle_info({'DOWN', Ref, _, Pid, _}, #state{sender = {Pid, Ref}} = State) ->
     {noreply, State#state{sender = nil}, 0}.
@@ -97,11 +87,14 @@ handle_info({'DOWN', Ref, _, Pid, _}, #state{sender = {Pid, Ref}} = State) ->
 terminate(_Reason, _State) ->
     ok.
 
+code_change(_OldVsn, {state, Buffer, Sender, Count}, _Extra) ->
+    Max = list_to_integer(config:get("rexi", "buffer_count", "2000")),
+    {ok, #state{buffer=Buffer, sender=Sender, count=Count, max_count=Max}};
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-should_drop() ->
-    erlang:memory(total) > ?MAX_MEMORY.
+should_drop(#state{count = Count, max_count = Max}) ->
+    Count >= Max.
 
 get_node({_, Node}) when is_atom(Node) ->
     Node;
