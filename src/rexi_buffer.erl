@@ -52,11 +52,11 @@ handle_call(get_buffered_count, _From, State) ->
     {reply, State#state.count, State, 0}.
 
 handle_cast({deliver, Dest, Msg}, #state{buffer = Q, count = C} = State) ->
-    margaret_counter:increment([erlang, rexi, buffered]),
+    couch_stats:increment_counter([erlang, rexi, buffered]),
     Q2 = queue:in({Dest, Msg}, Q),
     case should_drop(State) of
         true ->
-            margaret_counter:increment([erlang, rexi, dropped]),
+            couch_stats:increment_counter([erlang, rexi, dropped]),
             {noreply, State#state{buffer = queue:drop(Q2)}, 0};
         false ->
             {noreply, State#state{buffer = Q2, count = C+1}, 0}
