@@ -139,6 +139,9 @@ stream_init(Timeout) ->
             couch_stats:increment_counter(
                 [rexi, streams, timeout, init_stream]
             ),
+            rexi:reply({rexi_EXIT, timeout}),
+            % Exit 'normal' to avoid spamming logs. Usually it is because
+            % the coordinator process dies.
             exit(normal);
         Else ->
             exit({invalid_stream_message, Else})
@@ -185,6 +188,9 @@ stream(Msg, Limit, Timeout) ->
             ok
     catch throw:timeout ->
         couch_stats:increment_counter([rexi, streams, timeout, stream]),
+        rexi:reply({rexi_EXIT, timeout}),
+        % Exit 'normal' to avoid spamming logs. Usually it is because
+        % the coordinator process dies.
         exit(normal)
     end.
 
@@ -212,6 +218,9 @@ stream2(Msg, Limit, Timeout) ->
             ok
     catch throw:timeout ->
         couch_stats:increment_counter([rexi, streams, timeout, stream]),
+        rexi:reply({rexi_EXIT, timeout}),
+        % Exit 'normal' to avoid spamming logs. Usually it is because
+        % the coordinator process dies.
         exit(normal)
     end.
 
@@ -257,6 +266,9 @@ init_stream(Timeout) ->
             couch_stats:increment_counter(
                 [rexi, streams, timeout, init_stream]
             ),
+            rexi:reply({rexi_EXIT, timeout}),
+            % Exit 'normal' to avoid spamming logs. Usually it is because
+            % the coordinator process dies.
             exit(normal);
         Else ->
             exit({invalid_stream_message, Else})
